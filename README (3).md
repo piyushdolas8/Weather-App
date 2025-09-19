@@ -6,7 +6,7 @@ Built with **HTML, CSS, and JavaScript**.
 ---
 
 ## 👀 Preview
-![App Screenshot](./screenshot.png)
+![App Screenshot](./Screenshot (241).png)
 
 ---
 
