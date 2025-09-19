@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Simple Weather App</title>
+  <style>
+    :root{--bg:#f3f7fb;--card:#ffffff;--accent:#2b8cff;--muted:#6b7280}
+    *{box-sizing:border-box}
+    body{font-family:Inter,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial;margin:0;background:linear-gradient(180deg,#e8f0ff 0%,var(--bg) 100%);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:32px}
+    .app{width:100%;max-width:760px}
+    header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+    h1{font-size:20px;margin:0;color:#0f172a}
+    .controls{display:flex;gap:8px}
+    input[type="text"]{padding:10px 12px;border-radius:10px;border:1px solid #e6eefc;min-width:220px;outline:none;box-shadow:0 1px 0 rgba(16,24,40,0.02);font-size:15px}
+    button{background:var(--accent);color:white;border:none;padding:10px 14px;border-radius:10px;font-weight:600;cursor:pointer}
+    button:active{transform:translateY(1px)}
+    .card{background:var(--card);border-radius:14px;padding:20px;box-shadow:0 8px 30px rgba(16,24,40,0.06)}
+    .result{display:grid;grid-template-columns:120px 1fr;gap:16px;align-items:center}
+    .icon{width:120px;height:120px;display:flex;align-items:center;justify-content:center}
+    .icon img{max-width:100%;max-height:100%}
+    .meta{display:flex;flex-direction:column;gap:4px}
+    .temp{font-size:36px;font-weight:700;color:#0f172a}
+    .cond{font-size:15px;color:var(--muted)}
+    .row{display:flex;gap:12px;margin-top:10px;flex-wrap:wrap}
+    .pill{background:#f7f9ff;padding:8px 10px;border-radius:10px;font-size:13px;color:#0f172a}
+    .muted{color:var(--muted);font-size:13px}
+    .loader{width:18px;height:18px;border-radius:50%;border:3px solid rgba(0,0,0,0.08);border-top-color:var(--accent);animation:spin 1s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .help{font-size:13px;color:var(--muted);margin-top:8px}
+    footer{font-size:13px;color:var(--muted);margin-top:12px;text-align:center}
+    @media (max-width:520px){.result{grid-template-columns:1fr;gap:12px}.icon{width:80px;height:80px}}
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header>
+      <h1>Weather — enter a city or postcode</h1>
+      <div class="controls">
+        <input id="locationInput" type="text" placeholder="e.g. London or 10001" aria-label="location input" />
+        <button id="getBtn">Get Weather</button>
+      </div>
+    </header>
+
+    <section class="card">
+      <div id="output" class="result" aria-live="polite">
+        <div class="icon" id="iconPlace">
+          <!-- icon here -->
+        </div>
+        <div class="meta">
+          <div>
+            <div id="place" class="muted">Enter a location and press Get Weather</div>
+            <div id="temp" class="temp"></div>
+            <div id="condition" class="cond"></div>
+          </div>
+          <div class="row" id="extras" style="display:none">
+            <div class="pill" id="feels">Feels: —</div>
+            <div class="pill" id="humidity">Humidity: —</div>
+            <div class="pill" id="wind">Wind: —</div>
+            <div class="pill" id="aqi">AQI: —</div>
+          </div>
+        </div>
+      </div>
+      <div class="help">Tip: you can enter city name, city + country ("Paris, FR"), postal code, or a latitude,longitude pair.</div>
+      <footer>Note: this example uses a client-side API key — for production move the key to a server or proxy to avoid exposing it.</footer>
+    </section>
+  </main>
+
+  <script>
+    // --- Configuration ---
+    const API_KEY = 'b59bbb03e0b54f92990164741251909';
+    const BASE = 'http://api.weatherapi.com/v1/current.json';
+
+    // --- UI refs ---
+    const input = document.getElementById('locationInput');
+    const btn = document.getElementById('getBtn');
+    const placeEl = document.getElementById('place');
+    const tempEl = document.getElementById('temp');
+    const condEl = document.getElementById('condition');
+    const iconPlace = document.getElementById('iconPlace');
+    const extras = document.getElementById('extras');
+    const feels = document.getElementById('feels');
+    const humidity = document.getElementById('humidity');
+    const wind = document.getElementById('wind');
+    const aqi = document.getElementById('aqi');
+
+    // helper: show loading state on the button
+    function setLoading(loading){
+      if(loading){
+        btn.disabled = true;
+        btn.innerHTML = '<span class="loader" aria-hidden="true"></span>';
+      } else {
+        btn.disabled = false;
+        btn.textContent = 'Get Weather';
+      }
+    }
+
+    async function getWeather(query){
+      if(!query) return;
+      setLoading(true);
+      placeEl.textContent = 'Loading...';
+      tempEl.textContent = '';
+      condEl.textContent = '';
+      iconPlace.innerHTML = '';
+      extras.style.display = 'none';
+
+      try{
+        const url = `${BASE}?key=${API_KEY}&q=${encodeURIComponent(query)}&aqi=yes`;
+        const res = await fetch(url);
+        if(!res.ok){
+          throw new Error(`API error: ${res.status} ${res.statusText}`);
+        }
+        const data = await res.json();
+        // populate UI
+        const loc = data.location;
+        const cur = data.current;
+        placeEl.textContent = `${loc.name}, ${loc.region ? loc.region + ', ' : ''}${loc.country}`;
+        tempEl.textContent = `${cur.temp_c}°C (${cur.temp_f}°F)`;
+        condEl.textContent = cur.condition && cur.condition.text ? cur.condition.text : '';
+        if(cur.condition && cur.condition.icon){
+          // icon from WeatherAPI sometimes starts with //
+          const iconUrl = cur.condition.icon.startsWith('//') ? 'https:' + cur.condition.icon : cur.condition.icon;
+          iconPlace.innerHTML = `<img src="${iconUrl}" alt="weather icon" />`;
+        }
+
+        feels.textContent = `Feels: ${cur.feelslike_c}°C`;
+        humidity.textContent = `Humidity: ${cur.humidity}%`;
+        wind.textContent = `Wind: ${cur.wind_kph} kph`;
+
+        // air quality may or may not be present depending on plan
+        if(cur.air_quality){
+          // show a simple PM2.5 reading if available
+          const aq = cur.air_quality;
+          const pm25 = aq['pm2_5'] || aq.pm2_5;
+          if(pm25 !== undefined){
+            aqi.textContent = `PM2.5: ${Number(pm25).toFixed(2)}`;
+            aqi.style.display = 'inline-block';
+          } else {
+            aqi.style.display = 'none';
+          }
+        } else {
+          aqi.style.display = 'none';
+        }
+
+        extras.style.display = 'flex';
+      } catch(err){
+        placeEl.textContent = 'Could not fetch weather';
+        condEl.textContent = err.message || String(err);
+      } finally{
+        setLoading(false);
+      }
+    }
+
+    // event handlers
+    btn.addEventListener('click', ()=>{ const q = input.value.trim(); if(!q){ input.focus(); return; } getWeather(q); });
+    input.addEventListener('keyup', (e)=>{ if(e.key === 'Enter'){ btn.click(); } });
+
+    // Pre-fill with example (optional)
+    // getWeather('London');
+  </script>
+</body>
+</html>
